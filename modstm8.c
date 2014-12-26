@@ -226,6 +226,7 @@ void sendFrame(uint8_t ch, Mod_Master_Frame_TypeDef* aFrame)
 	setTX();
 	
 	aFrame->modState = Mod_State_Sending;
+	UART2_Cmd(ENABLE);
 	for (ch = 0; ch < 100; ch ++)
 		TX_Pin = TRUE;
 
@@ -278,42 +279,7 @@ void modProcessRely(Mod_Master_Frame_TypeDef* aFrame)
 			sendFrame(2, aFrame);
 		}
 	}
-	//PROCESS REPLY
-	if (aFrame->modState == Mod_State_ProcessReply)
-	{		
-		if (aFrame->rxCursor < 2) 
-			aFrame->rxCursor = 10;
-		crc = CRC16(aFrame->rxframe, aFrame->rxCursor - 2);
-		val = ((uint16_t)(aFrame->rxframe[aFrame->rxCursor - 1]) << 8) + 
-			aFrame->rxframe[aFrame->rxCursor - 2];
-		if (crc != val)
-		{
-			if (aFrame->retryCount < MOD_MAX_RETRYS) //exceed max retry count
-			{
-				//resend , count ++
-				aFrame->retryCount ++;
-				aFrame->modState = Mod_State_Sending;
-				sendFrame(2, aFrame);
-				return;
-			} else {
-				//commucation error
-				aFrame->retryCount = 0;
-				aFrame->linkFail = TRUE;
-				aFrame->modState = Mod_State_Idle;
-				aFrame->request = FALSE;
-				
-				return;
-			}
-		} else {
-			//process reply
-			frameProcessData(aFrame);
-			aFrame->retryCount = 0;
-			aFrame->linkFail = FALSE;
-			aFrame->modState = Mod_State_Idle;
-			aFrame->request = FALSE;
-			return;
-		}
-	}
+
 	
 }
 
@@ -730,7 +696,7 @@ void mod_int_rx()
 			setFrameCheck(MOD_TIMER_STOP);
 			modFrame.modState = Mod_State_ProcessReply;
 
-			setTX();
+
 	
 			modFrame.rxBufOver = TRUE;
 		}
@@ -748,7 +714,8 @@ void mod_int_rx()
 
 		setTimeoutCheck(MOD_TIMER_STOP);
 		setFrameCheck(MOD_TIMER_STOP);
-		setTX();
+		
+		UART2_Cmd(DISABLE);
 
 
 		modFrame.rxOver = TRUE;
@@ -828,6 +795,7 @@ void mod_int_timeout()
 
 void mod_int_frame_timeout()
 {
+	uint16_t crc, val;
 	//exception Slave or unexception Slave
 	TIM4_ClearITPendingBit(TIM4_IT_UPDATE);
 
@@ -848,7 +816,42 @@ void mod_int_frame_timeout()
 		setFrameCheck(MOD_TIMER_STOP);
 	}
 
-
+	//PROCESS REPLY
+	if (modFrame.modState == Mod_State_ProcessReply)
+	{		
+		if (modFrame.rxCursor < 2) 
+			modFrame.rxCursor = 10;
+		crc = CRC16(modFrame.rxframe, modFrame.rxCursor - 2);
+		val = ((uint16_t)(modFrame.rxframe[modFrame.rxCursor - 1]) << 8) + 
+			modFrame.rxframe[modFrame.rxCursor - 2];
+		if (crc != val)
+		{
+			if (modFrame.retryCount < MOD_MAX_RETRYS) //exceed max retry count
+			{
+				//resend , count ++
+				modFrame.retryCount ++;
+				modFrame.modState = Mod_State_Sending;
+				sendFrame(2, &modFrame);
+				return;
+			} else {
+				//commucation error
+				modFrame.retryCount = 0;
+				modFrame.linkFail = TRUE;
+				modFrame.modState = Mod_State_Idle;
+				modFrame.request = FALSE;
+				
+				return;
+			}
+		} else {
+			//process reply
+			frameProcessData(&modFrame);
+			modFrame.retryCount = 0;
+			modFrame.linkFail = FALSE;
+			modFrame.modState = Mod_State_Idle;
+			modFrame.request = FALSE;
+			return;
+		}
+	}
 }
 
 #ifdef USE_FULL_ASSERT
