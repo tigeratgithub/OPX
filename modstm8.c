@@ -192,23 +192,23 @@ void setFrameCheck(Mod_Timer_Check_TypeDef act)
 
 void setRX()
 {
-
+	//disableInterrupts();
 	
 	UART2_ITConfig(UART2_IT_TXE | UART2_IT_TC, DISABLE);
 	UART2_ITConfig(UART2_IT_RXNE_OR, ENABLE);
 	
-
+	//enableInterrupts();
 }
 
 void setTX()
 {
-
+	//disableInterrupts();
 	
 	UART2_ITConfig(UART2_IT_RXNE_OR, DISABLE);
 	UART2_ITConfig(UART2_IT_TXE | UART2_IT_TC, DISABLE);
 	UART2_ITConfig(UART2_IT_TXE, ENABLE);
 	
-
+	//enableInterrupts();	
 }
 
 void sendFrame(uint8_t ch, Mod_Master_Frame_TypeDef* aFrame)
@@ -220,18 +220,20 @@ void sendFrame(uint8_t ch, Mod_Master_Frame_TypeDef* aFrame)
 	aFrame->txOK = FALSE;
 
 
+	//disableInterrupts();
 	setTimeoutCheck(MOD_TIMER_STOP);
 	setFrameCheck(MOD_TIMER_STOP);
 	setTX();
 	
 	aFrame->modState = Mod_State_Sending;
-	//for (ch = 0; ch < 100; ch ++)
+	for (ch = 0; ch < 100; ch ++)
 		TX_Pin = TRUE;
 
 	UART2_SendData9(aFrame->txframe[0]);
 
 
 	
+	//enableInterrupts();
 	
 	return;
 }
@@ -756,10 +758,10 @@ void mod_int_rx()
 void mod_int_tx(void)
 {
 	uint16_t val;
-	
+	UART2_ClearITPendingBit(UART2_IT_RXNE);
 	if (UART2_GetITStatus(UART2_IT_TXE) == SET)
 	{
-		UART2_ClearITPendingBit(UART2_IT_RXNE);
+
 		if (modFrame.txCursor < (modFrame.txLen - 1))
 		{
 			modFrame.txCursor ++;
@@ -774,30 +776,37 @@ void mod_int_tx(void)
 	}
 	if (UART2_GetITStatus(UART2_IT_TC) == SET)
 	{
-		UART2->SR &= 0xBF;	//Çå³ýTC±êÖ¾
+		//setRX();
 
 		
 		if (modFrame.txCursor >= (modFrame.txLen - 1))
 		{
 			modFrame.txOK = TRUE;
-			UART2_ITConfig(UART2_IT_TC | UART2_IT_TXE, DISABLE);
+			UART2_ITConfig(UART2_IT_TC, DISABLE);
 
+			UART2_ITConfig(UART2_IT_RXNE_OR, ENABLE);
+			
 			modFrame.rxOK = FALSE;
 			modFrame.rxCursor = 0;
 			modFrame.rxLen = 0;
 			modFrame.rxBufOver = FALSE;
 			modFrame.rxOver = FALSE;
 			
+			disableInterrupts()
+
+			
+			setTimeoutCheck(MOD_TIMER_START);
+			setFrameCheck(MOD_TIMER_STOP);
+			UART2_ITConfig(UART2_IT_RXNE_OR | UART2_IT_TXE | UART2_IT_TC, DISABLE);
 			UART2_ITConfig(UART2_IT_RXNE_OR, ENABLE);
 			
 			modFrame.modState = Mod_State_WaitForReply;
-			setFrameCheck(MOD_TIMER_STOP);
-
-			//TX_Pin = FALSE;
-			setTimeoutCheck(MOD_TIMER_START);
+			for (val = 0; val < 100; val ++)
+				TX_Pin = FALSE;
+			
 			modFrame.modEvent = Mod_Event_No;	//reset Event
 
-
+			enableInterrupts();
 		}
  
 	}

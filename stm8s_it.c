@@ -253,10 +253,8 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 		}
 		
 	
-	} else {
-		
-		modProcessRely(&modFrame);
 	}
+	modProcessRely(&modFrame);
 
 }
 

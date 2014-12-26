@@ -112,8 +112,7 @@ void main(void)
 	lcd1602_init();
 
 	modbusRTUInit(57600);
-	//mod_master_send(12, ReadHoldRegs, 100, 4);
-	//sendFrame(2, &modFrame);
+
 	//uart2SendStr("Hello World!");
 
 	while (1) 

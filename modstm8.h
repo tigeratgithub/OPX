@@ -124,7 +124,6 @@ void mod_master_send(uint8_t wsAddr, Mod_Cmd_Code_TypeDef cmdCode,
 void modProcessRely(Mod_Master_Frame_TypeDef* aFrame);
 unsigned short CRC16 (uint8_t *puchMsg, uint8_t usDataLen );
 void frameProcessData(Mod_Master_Frame_TypeDef* aFrame);
-void sendFrame(uint8_t ch, Mod_Master_Frame_TypeDef* aFrame);
 
 void mod_int_frame_timeout(void);
 void setINTPri(void);
