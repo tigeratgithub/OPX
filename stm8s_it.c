@@ -25,7 +25,7 @@
 #include "stm8s_it.h"
 #include "modstm8.h"
 #include "main.h"
-
+#include "key.h"
 
 extern Mod_Master_Frame_TypeDef modFrame;
 /** @addtogroup Template_Project
@@ -217,6 +217,7 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 }
 
+extern T_Keys_TypeDef tkeys;
 /**
   * @brief Timer1 Update/Overflow/Trigger/Break Interrupt routine.
   * @param  None
@@ -231,7 +232,7 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 	TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
 	//Ö÷Ñ­»·
 	//¼ì²â°´¼ü¼ì²â
-	
+	scankeys(&tkeys);
 	
 	if (modFrame.modState == Mod_State_Idle && 
 		modFrame.request == FALSE)

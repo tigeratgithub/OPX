@@ -27,6 +27,7 @@
 #include "stdio.h"
 #include "main.h"
 #include "modstm8.h"
+#include "key.h"
 
 s32 adc1_sum = 0;
 s32 adc1_sumcount = 0;
@@ -38,6 +39,7 @@ static void GPIO_Config(void);
 static void TIM_Config(void);
 
 extern uint16_t v1, v2, v3, v4;
+extern T_Keys_TypeDef tkeys;
 
 _Bool TX_Pin @GPIOD_BaseAddress:7;
 
@@ -144,7 +146,7 @@ void main(void)
 			lcd1602_write_str(0, 0, str);
 
 
-			sprintf(str, "len=%d %d,%d,%d", (uint16_t)modFrame.retryCount, 
+			sprintf(str, "len=%d %d,%d,%d", (uint16_t)tkeys.cur, 
 			READ_WORD(&(modFrame.data[0])), READ_WORD(&(modFrame.data[2])), 
 			READ_WORD(&(modFrame.data[4])));
 			lcd1602_write_str(0, 1, str);
