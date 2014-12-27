@@ -58,6 +58,22 @@ typedef enum mod_errcode
 	Mod_Err_Unknow			= 0x04
 } Mod_Exception_TypeDef;
 
+typedef struct mod_int_status
+{
+	_Bool	timeout_int_en;
+	_Bool	frame_int_en;
+	_Bool	tx_int_en;
+	_Bool	rx_int_en;
+	_Bool	cycle_int_en;
+	
+	_Bool	timeout_int_act;
+	_Bool	frame_int_act;
+	_Bool	tx_int_act;
+	_Bool	rx_int_act;
+	_Bool	cycle_int_act;
+
+} Mod_Int_Status_TypeDef;
+
 #define MOD_MAX_DATA_LEN	32
 #define MOD_MAX_BUF_LEN		50
 #define MOD_MAX_RETRYS		3
@@ -121,9 +137,10 @@ void MOD_UART_Config(uint32_t baud);
 void MOD_TIM_Config(Mod_Master_Frame_TypeDef* aFrame);
 void mod_master_send(uint8_t wsAddr, Mod_Cmd_Code_TypeDef cmdCode, 
 		uint16_t dataAddr, uint8_t dataLen);
-void modProcessRely(Mod_Master_Frame_TypeDef* aFrame);
+void cycleWork(Mod_Master_Frame_TypeDef* aFrame);
 unsigned short CRC16 (uint8_t *puchMsg, uint8_t usDataLen );
 void frameProcessData(Mod_Master_Frame_TypeDef* aFrame);
+void sendFrame(uint8_t ch, Mod_Master_Frame_TypeDef* aFrame);
 
 void mod_int_frame_timeout(void);
 void setINTPri(void);
@@ -131,7 +148,8 @@ void mod_int_rx(void);
 void mod_int_tx(void);
 void mod_int_timeout(void);
 
-void setRX(void);
-void setTX(void);
+void startRX(void);
+void startTX(void);
+void stopUART(void);
 
 #endif

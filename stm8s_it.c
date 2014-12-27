@@ -230,6 +230,9 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 	uint8_t i;
 	TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
 	//Ö÷Ñ­»·
+	//¼ì²â°´¼ü¼ì²â
+	
+	
 	if (modFrame.modState == Mod_State_Idle && 
 		modFrame.request == FALSE)
 	{
@@ -252,9 +255,10 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 			mod_master_send(1, WriteMultiRegs, 100, 4);
 		}
 		
-	
+		cycleWork(&modFrame);
+	} else {
+		//do something ?
 	}
-	modProcessRely(&modFrame);
 
 }
 

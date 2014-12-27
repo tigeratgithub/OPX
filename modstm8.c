@@ -8,6 +8,16 @@ void t_assert_failed(u8* file, u32 line);
 
 extern _Bool TX_Pin;
 
+_Bool UART2_REN @(UART2_BaseAddress + 5):2;
+_Bool UART2_TEN @(UART2_BaseAddress + 5):3;
+_Bool UART2_RIEN @(UART2_BaseAddress + 5):5;
+_Bool UART2_TCIEN @(UART2_BaseAddress + 5):6;
+_Bool UART2_TIEN @(UART2_BaseAddress + 5):7;
+_Bool UART2_RXNE @UART2_BaseAddress:5;
+_Bool UART2_TC 	@UART2_BaseAddress:6;
+_Bool UART2_TXE @UART2_BaseAddress:7;
+
+
 uint8_t *DI, *COILS, *M, *V;
 
 /* Table of CRC values for high¨Corder byte */ 
@@ -55,7 +65,7 @@ const char auchCRCLo[] = {
 }; 
 
 Mod_Master_Frame_TypeDef modFrame;
-
+Mod_Int_Status_TypeDef modInts;
 
 
 void modbusRTUInit(uint32_t baud)
@@ -88,6 +98,7 @@ void modbusRTUInit(uint32_t baud)
 	MOD_UART_Config(modFrame.baud);
 	MOD_TIM_Config(&modFrame);
 	modFrame.modState = Mod_State_Idle;
+	
 }
 
 void MOD_UART_Config(uint32_t baud)
@@ -100,8 +111,8 @@ void MOD_UART_Config(uint32_t baud)
         - Receive and transmit enabled
 	*/
 	UART2_DeInit();
-	UART2_Init(baud, UART2_WORDLENGTH_9D, UART2_STOPBITS_1, 
-				UART2_PARITY_EVEN,
+	UART2_Init(baud, UART2_WORDLENGTH_8D, UART2_STOPBITS_1, 
+				UART2_PARITY_NO,
 				UART2_SYNCMODE_CLOCK_DISABLE, UART2_MODE_TXRX_ENABLE);
 
 	UART2_ClearITPendingBit(UART2_IT_RXNE);
@@ -140,28 +151,22 @@ void MOD_TIM_Config(Mod_Master_Frame_TypeDef* aFrame)
 
 void setTimeoutCheck(Mod_Timer_Check_TypeDef act)
 {
-    /* Set the Autoreload value */
-	//uint16_t arr;
-	//arr = aFrame->timeout * 25;
-	
 	if (act == MOD_TIMER_START)
 	{
 		TIM2_Cmd(DISABLE);
-
 		TIM2_SetCounter(0);
-
-		TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE);
-	
 		TIM2_Cmd(ENABLE);
+		modInts.timeout_int_en = TRUE;
 	} else if (act == MOD_TIMER_PAUSE) {
 		TIM2_Cmd(DISABLE);
+		modInts.timeout_int_en = FALSE;
 	} else if (act == MOD_TIMER_RESUM) {
 		TIM2_Cmd(ENABLE);
+		modInts.timeout_int_en = TRUE;
 	} else if (act == MOD_TIMER_STOP) {
 		TIM2_Cmd(DISABLE);
-		TIM2_SetCounter(0);
+		modInts.timeout_int_en = FALSE;
 	}
-	
 }
 
 void setFrameCheck(Mod_Timer_Check_TypeDef act)
@@ -176,102 +181,96 @@ void setFrameCheck(Mod_Timer_Check_TypeDef act)
 		//TIM4_ClearFlag(TIM4_FLAG_UPDATE);
 		//TIM4_UpdateDisableConfig(DISABLE);
 		
-		TIM4_ITConfig(TIM4_IT_UPDATE, ENABLE);
-	
 		TIM4_Cmd(ENABLE);
+		modInts.frame_int_en = TRUE;
 	} else if (act == MOD_TIMER_PAUSE) {
 		TIM4_Cmd(DISABLE);
+		modInts.frame_int_en = FALSE;
 	} else if (act == MOD_TIMER_RESUM) {
 		TIM4_Cmd(ENABLE);
+		modInts.frame_int_en = TRUE;
 	} else if (act == MOD_TIMER_STOP) {
 		TIM4_Cmd(DISABLE);
-		TIM4_SetCounter(0);
+		modInts.frame_int_en = FALSE;
 	}	
 
 }
 
-void setRX()
+void startRX()
 {
-	//disableInterrupts();
+	//tien tcien rien 7, 6, 5
+	UART2_TIEN = FALSE;
+	UART2_TCIEN = FALSE;
 	
-	UART2_ITConfig(UART2_IT_TXE | UART2_IT_TC, DISABLE);
-	UART2_ITConfig(UART2_IT_RXNE_OR, ENABLE);
-	
-	//enableInterrupts();
+	//rxne bit5 tc bit6
+	UART2_TXE = FALSE;
+	UART2_TC = FALSE;
+	UART2_RXNE = FALSE;
+
+	UART2_RIEN = TRUE;
+	UART2_REN = TRUE;
+	TX_Pin = FALSE;
 }
 
-void setTX()
+void startTX()
 {
-	//disableInterrupts();
-	
-	UART2_ITConfig(UART2_IT_RXNE_OR, DISABLE);
-	UART2_ITConfig(UART2_IT_TXE | UART2_IT_TC, DISABLE);
-	UART2_ITConfig(UART2_IT_TXE, ENABLE);
-	
-	//enableInterrupts();	
+	//rxne bit5 tc bit6
+	UART2_RIEN = FALSE;
+	UART2_TXE = FALSE;
+	UART2_TC = FALSE;
+	UART2_RXNE = FALSE;
+
+	UART2_TCIEN = FALSE;
+	UART2_TIEN = FALSE;
+	UART2_TEN = TRUE;
+
+	TX_Pin = TRUE;
 }
 
-void sendFrame(uint8_t ch, Mod_Master_Frame_TypeDef* aFrame)
+void stopUART()
+{
+	UART2_TCIEN = FALSE;
+	UART2_TIEN = FALSE;
+	UART2_RIEN = FALSE;
+	
+	UART2_TC = FALSE;
+	UART2_TXE = FALSE;
+	UART2_RXNE = FALSE;
+	
+	UART2_REN = FALSE;
+	UART2_TEN = FALSE;
+
+}
+
+void sendFrame(uint8_t ch, Mod_Master_Frame_TypeDef* aframe)
 {
 	if (ch != 2) return;
 	
-	aFrame->request = FALSE;
-	aFrame->txCursor = 0;
-	aFrame->txOK = FALSE;
-
-
-	//disableInterrupts();
 	setTimeoutCheck(MOD_TIMER_STOP);
 	setFrameCheck(MOD_TIMER_STOP);
-	setTX();
+	stopUART();
 	
-	aFrame->modState = Mod_State_Sending;
-	UART2_Cmd(ENABLE);
-	for (ch = 0; ch < 100; ch ++)
-		TX_Pin = TRUE;
+	aframe->request = FALSE;
+	aframe->txCursor = 0;
+	aframe->txOK = FALSE;
 
-	UART2_SendData9(aFrame->txframe[0]);
 
 
 	
-	//enableInterrupts();
+	aframe->modState = Mod_State_Sending;
+	//for (ch = 0; ch < 100; ch ++)
+	
+	startTX();
+	UART2_SendData8(aframe->txframe[0]);
+	UART2_TIEN = TRUE;
 	
 	return;
 }
 
-void modProcessRely(Mod_Master_Frame_TypeDef* aFrame)
+void cycleWork(Mod_Master_Frame_TypeDef* aFrame)
 {
 	//for ProcessErr, Idle, waitforreply
 	uint16_t crc,val;
-	if (aFrame->modState == Mod_State_ProcessErr)
-	{
-		if (aFrame->modEvent == Mod_Event_RespTimeout)
-		{
-			if (aFrame->retryCount < MOD_MAX_RETRYS) //exceed max retry count
-			{
-				//resend , count ++
-				aFrame->retryCount ++;
-				aFrame->modState = Mod_State_Sending;
-				sendFrame(2, aFrame);
-				return;
-			} else {
-				//commucation error
-				aFrame->retryCount = 0;
-				aFrame->linkFail = TRUE;
-				aFrame->modState = Mod_State_Idle;
-				
-				setTimeoutCheck(MOD_TIMER_STOP);
-				setFrameCheck(MOD_TIMER_STOP);
-				setTX();
-
-
-				return;
-			}			
-		} else {
-			//process exception code
-			//todo 
-		}
-	}
 	if (aFrame->modState == Mod_State_Idle)
 	{
 		if (aFrame->request == TRUE)
@@ -279,7 +278,6 @@ void modProcessRely(Mod_Master_Frame_TypeDef* aFrame)
 			sendFrame(2, aFrame);
 		}
 	}
-
 	
 }
 
@@ -339,9 +337,6 @@ void frameProcessData(Mod_Master_Frame_TypeDef* aFrame)
 			
 		}
 	}
-	aFrame->modState = Mod_State_Idle;
-	aFrame->request = FALSE;
-	
 }
 
 /*
@@ -500,11 +495,6 @@ unsigned short CRC16 (uint8_t *puchMsg, uint8_t usDataLen )
 //}
 
 
-void mod_master_recive()
-{
-	
-}
-
 void mod_master_send(uint8_t wsAddr, Mod_Cmd_Code_TypeDef cmdCode, 
 		uint16_t dataAddr, uint8_t dataLen)
 {
@@ -517,7 +507,7 @@ void mod_master_send(uint8_t wsAddr, Mod_Cmd_Code_TypeDef cmdCode,
 	modFrame.dataLen = dataLen;
 	switch (cmdCode)
 	{
-		case	ReadCoils:	
+		case	ReadCoils:
 		case	ReadDInput:
 		case 	ReadHoldRegs:
 		case 	ReadInputRegs:
@@ -663,7 +653,7 @@ void setmembuf(uint8_t *di, uint8_t *coils, uint8_t *m, uint8_t *v)
 void setINTPri(void)
 {
 	disableInterrupts();
-	ITC_SetSoftwarePriority(ITC_IRQ_TIM1_OVF, ITC_PRIORITYLEVEL_3);
+	ITC_SetSoftwarePriority(ITC_IRQ_TIM1_OVF, ITC_PRIORITYLEVEL_2);
 	ITC_SetSoftwarePriority(ITC_IRQ_ADC1, ITC_PRIORITYLEVEL_1);
 	ITC_SetSoftwarePriority(ITC_IRQ_TIM2_OVF, ITC_PRIORITYLEVEL_2);
 	ITC_SetSoftwarePriority(ITC_IRQ_TIM4_OVF, ITC_PRIORITYLEVEL_2);
@@ -682,8 +672,6 @@ void mod_int_rx()
 		UART2_ClearFlag (UART2_FLAG_RXNE);
 		if (modFrame.rxCursor < (sizeof(modFrame.rxframe) - 1))
 		{
-			if (modFrame.rxCursor == 11) 
-				modFrame.rxframe[0] = 1; 
 			modFrame.rxframe[modFrame.rxCursor] = UART2_ReceiveData8();
 			modFrame.rxCursor ++;
 			setFrameCheck(MOD_TIMER_START);
@@ -695,7 +683,6 @@ void mod_int_rx()
 			setTimeoutCheck(MOD_TIMER_STOP);
 			setFrameCheck(MOD_TIMER_STOP);
 			modFrame.modState = Mod_State_ProcessReply;
-
 
 	
 			modFrame.rxBufOver = TRUE;
@@ -714,73 +701,74 @@ void mod_int_rx()
 
 		setTimeoutCheck(MOD_TIMER_STOP);
 		setFrameCheck(MOD_TIMER_STOP);
-		
-		UART2_Cmd(DISABLE);
-
 
 		modFrame.rxOver = TRUE;
 	}
 }
 
+
 void mod_int_tx(void)
 {
 	uint16_t val;
-	UART2_ClearITPendingBit(UART2_IT_RXNE);
+	
 	if (UART2_GetITStatus(UART2_IT_TXE) == SET)
 	{
-
+		UART2_ClearITPendingBit(UART2_IT_RXNE);
 		if (modFrame.txCursor < (modFrame.txLen - 1))
 		{
 			modFrame.txCursor ++;
-			UART2_SendData9(modFrame.txframe[modFrame.txCursor]);
+			if (modFrame.txCursor == 1)
+				modFrame.txCursor = 0 + 1;
+			UART2_SendData8(modFrame.txframe[modFrame.txCursor]);
 			if (modFrame.txCursor >= modFrame.txLen - 1)
 			{
-				UART2_ITConfig(UART2_IT_TXE, DISABLE);
-				UART2_ITConfig(UART2_IT_TC, ENABLE);
+				UART2_TIEN = FALSE;
+				UART2_TCIEN = TRUE;
 			}
 		}
-
+		else
+		{
+			startRX();
+		}
 	}
 	if (UART2_GetITStatus(UART2_IT_TC) == SET)
 	{
-		//setRX();
-
+		stopUART();
 		
-		if (modFrame.txCursor >= (modFrame.txLen - 1))
-		{
+		//if (modFrame.txCursor >= (modFrame.txLen - 1))
+		//{
 			modFrame.txOK = TRUE;
-			UART2_ITConfig(UART2_IT_TC, DISABLE);
 
-			UART2_ITConfig(UART2_IT_RXNE_OR, ENABLE);
-			
 			modFrame.rxOK = FALSE;
 			modFrame.rxCursor = 0;
 			modFrame.rxLen = 0;
 			modFrame.rxBufOver = FALSE;
 			modFrame.rxOver = FALSE;
-			
-			disableInterrupts()
 
 			
-			setTimeoutCheck(MOD_TIMER_START);
+
 			setFrameCheck(MOD_TIMER_STOP);
-			UART2_ITConfig(UART2_IT_RXNE_OR | UART2_IT_TXE | UART2_IT_TC, DISABLE);
-			UART2_ITConfig(UART2_IT_RXNE_OR, ENABLE);
-			
-			modFrame.modState = Mod_State_WaitForReply;
-			for (val = 0; val < 100; val ++)
-				TX_Pin = FALSE;
-			
-			modFrame.modEvent = Mod_Event_No;	//reset Event
+			setTimeoutCheck(MOD_TIMER_START);
 
-			enableInterrupts();
-		}
+			modFrame.modState = Mod_State_WaitForReply;
+			modFrame.modEvent = Mod_Event_No;	//reset Event
+			startRX();
+
+
+		//} else {
+		//	while(1);
+		//}
  
 	}
 }
 
 void mod_int_timeout()
 {
+	stopUART();
+	
+	setTimeoutCheck(MOD_TIMER_STOP);
+	setFrameCheck(MOD_TIMER_STOP);
+	
 	if (TIM2_GetITStatus(TIM2_IT_UPDATE) == SET)
 	{
 		TIM2_ClearITPendingBit(TIM2_IT_UPDATE);
@@ -789,36 +777,60 @@ void mod_int_timeout()
 		
 		modFrame.modState = Mod_State_ProcessErr;
 		modFrame.modEvent = Mod_Event_RespTimeout;
-		setTimeoutCheck(MOD_TIMER_STOP);
+
+		if (modFrame.retryCount < MOD_MAX_RETRYS) //exceed max retry count
+		{
+			//resend , count ++
+			modFrame.retryCount ++;
+			modFrame.modState = Mod_State_Sending;
+			sendFrame(2, &modFrame);
+			return;
+		} else {
+			//commucation error
+			modFrame.retryCount = 0;
+			modFrame.linkFail = TRUE;
+			modFrame.modState = Mod_State_Idle;
+			
+			setTimeoutCheck(MOD_TIMER_STOP);
+			setFrameCheck(MOD_TIMER_STOP);
+
+			return;
+		}			
+	} else {
+		//process exception code
+		//todo 
+		while(1);
 	}
+
 }
 
 void mod_int_frame_timeout()
 {
 	uint16_t crc, val;
+
+	stopUART();
+
+	setTimeoutCheck(MOD_TIMER_PAUSE);
+	setFrameCheck(MOD_TIMER_STOP);
+	
 	//exception Slave or unexception Slave
 	TIM4_ClearITPendingBit(TIM4_IT_UPDATE);
 
 
-	setTimeoutCheck(MOD_TIMER_PAUSE);
-	setFrameCheck(MOD_TIMER_STOP);
 	if (modFrame.rxframe[0] != modFrame.toAddr)
 	{
 		modFrame.rxCursor = 0;
+		modFrame.rxLen = 0;
 		modFrame.rxOK = FALSE;
+		
 		setTimeoutCheck(MOD_TIMER_RESUM);
-		setFrameCheck(MOD_TIMER_STOP);
+		startRX();
 	} else {
+
 		modFrame.rxOK = TRUE;
 		modFrame.modState = Mod_State_ProcessReply;
 		modFrame.modEvent = Mod_Event_No;
-		setTimeoutCheck(MOD_TIMER_STOP);
-		setFrameCheck(MOD_TIMER_STOP);
-	}
-
-	//PROCESS REPLY
-	if (modFrame.modState == Mod_State_ProcessReply)
-	{		
+		
 		if (modFrame.rxCursor < 2) 
 			modFrame.rxCursor = 10;
 		crc = CRC16(modFrame.rxframe, modFrame.rxCursor - 2);
@@ -851,8 +863,17 @@ void mod_int_frame_timeout()
 			modFrame.request = FALSE;
 			return;
 		}
+		
 	}
+
+
 }
+
+///////////////////////////////////////////////////////////////
+///////////////hardware interrupts Monit///////////////////////
+///////////////////////////////////////////////////////////////
+
+
 
 #ifdef USE_FULL_ASSERT
 

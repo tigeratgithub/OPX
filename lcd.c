@@ -34,13 +34,18 @@ unsigned char reverse_byte(unsigned char x);
 
 void sbi(uint8_t *r, uint8_t n) 
 { 
+	disableInterrupts();
 	(*r) |= (uint8_t)(1 << n); 
+	enableInterrupts();
 }
+
 void sbi(uint8_t *r, uint8_t n);
 void cbi(uint8_t *r, uint8_t n) ;
 void cbi(uint8_t *r, uint8_t n) 
 { 
+	disableInterrupts();
 	(*r) &= (uint8_t)~(1 << n); 
+	enableInterrupts();
 }
 
 void PORT_busy(void);

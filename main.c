@@ -51,6 +51,9 @@ void GPIO_Config()
 	GPIO_Init(GPIOB, GPIO_PIN_0 | GPIO_PIN_1, GPIO_MODE_IN_FL_NO_IT);
 	GPIO_Init(GPIOD, GPIO_PIN_7, GPIO_MODE_OUT_OD_LOW_FAST);
 	GPIO_Init(GPIOD, GPIO_PIN_4, GPIO_MODE_OUT_OD_LOW_FAST);
+	GPIO_Init(GPIOB, GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5, 
+		GPIO_MODE_IN_FL_NO_IT);
+		
 }
 
 void ADC_Config()
@@ -112,7 +115,8 @@ void main(void)
 	lcd1602_init();
 
 	modbusRTUInit(57600);
-
+	//mod_master_send(12, ReadHoldRegs, 100, 4);
+	//sendFrame(2, &modFrame);
 	//uart2SendStr("Hello World!");
 
 	while (1) 
