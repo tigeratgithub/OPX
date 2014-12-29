@@ -34,11 +34,12 @@ s32 adc1_sumcount = 0;
 _Bool adc1_update = FALSE;
 
 extern Mod_Master_Frame_TypeDef modFrame;
+extern _Bool KeyLL, KeyLT, KeyRT, KeyRR;
 static void ADC_Config(void);
 static void GPIO_Config(void);
 static void TIM_Config(void);
 
-extern uint16_t v1, v2, v3, v4;
+uint16_t v1, v2, v3, v4;
 extern T_Keys_TypeDef tkeys;
 
 _Bool TX_Pin @GPIOD_BaseAddress:7;
@@ -145,10 +146,12 @@ void main(void)
 			sprintf(str, "val=%3.2f%%", val);
 			lcd1602_write_str(0, 0, str);
 
-
-			sprintf(str, "len=%d %d,%d,%d", (uint16_t)tkeys.cur, 
-			READ_WORD(&(modFrame.data[0])), READ_WORD(&(modFrame.data[2])), 
-			READ_WORD(&(modFrame.data[4])));
+			v1 = (KeyLL) ? 1 : 0;
+			v2 = (KeyLT) ? 1 : 0;
+			v3 = (KeyRT) ? 1 : 0;
+			v4 = (KeyRR) ? 1 : 0;
+			
+			sprintf(str, "len=%d %d %d %d", v1, v2, v3, v4);
 			lcd1602_write_str(0, 1, str);
 			/*
 			if (uart2pipe.rxCursor == 0)

@@ -105,6 +105,7 @@ typedef struct mod_master_frame
 	_Bool				rxOver;	
 	_Bool				linkFail;
 	_Bool				heartbeat;
+	_Bool				respOK;
 	uint8_t				errCode;
 } Mod_Master_Frame_TypeDef;
 

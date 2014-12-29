@@ -246,6 +246,8 @@ void sendFrame(uint8_t ch, Mod_Master_Frame_TypeDef* aframe)
 {
 	if (ch != 2) return;
 	
+	aframe->respOK = FALSE;
+	
 	setTimeoutCheck(MOD_TIMER_STOP);
 	setFrameCheck(MOD_TIMER_STOP);
 	stopUART();
@@ -294,14 +296,15 @@ void frameProcessData(Mod_Master_Frame_TypeDef* aFrame)
 	{
 		aFrame->errCode = aFrame->rxframe[2];
 		//add err process FOR errCode
+		aFrame->respOK = FALSE;
 		return;
 	} else {
 		if (aFrame->cmdCode != aFrame->rxframe[1]) 
 		{
 			aFrame->errCode = Mod_Err_Unknow;
 			//add err process for cmdCode err
-
-			return;
+			aFrame->respOK = FALSE;
+			return ;
 		} else {
 			//start process 
 			switch (aFrame->cmdCode)
@@ -333,8 +336,10 @@ void frameProcessData(Mod_Master_Frame_TypeDef* aFrame)
 					//todo add cmd function process
 				}
 			}
-			
-			
+			aFrame->errCode = 0;
+			aFrame->linkFail = FALSE;
+			aFrame->respOK = TRUE;
+			return;
 		}
 	}
 }
@@ -579,30 +584,20 @@ void mod_master_send(uint8_t wsAddr, Mod_Cmd_Code_TypeDef cmdCode,
 			modFrame.txframe[4] = (uint8_t)(modFrame.dataLen >> 8);
 			modFrame.txframe[5] = (uint8_t)(modFrame.dataLen & 0x00ff);
 			len = modFrame.dataLen;
-			modFrame.txframe[6] = ((len % 8) == 1) ? (len % 8) : (len % 8) + 1;
-			j = 6;
-			while (len > 0)
+			modFrame.txframe[6] = ((len % 8) == 0) ? (len / 8) : (len / 8) + 1;
+			j = 7;
+
+			for (i = 0; i < modFrame.txframe[6]; i ++)
 			{
-				for (i = 0; i < 8; i ++)
-				{
-					if (modFrame.data[i] == 0)
-					{
-						modFrame.txframe[j] &= (uint8_t)(~(1 << i)); 
-					} else {
-						modFrame.txframe[j] |= (uint8_t)(1 << i);
-					}
-					len --;
-					if (len <= 0)
-						break;
-				}
-				if (len <= 0) break;
+				modFrame.txframe[j] = modFrame.data[i];
 				j ++;
 			}
-			crc = CRC16(modFrame.txframe, j + 1);
+
+			crc = CRC16(modFrame.txframe, j);
 			
-			modFrame.txframe[j + 1] = (uint8_t)(crc & 0x00ff);
-			modFrame.txframe[j + 2] = (uint8_t)(crc >> 8);	
-			modFrame.txLen = j + 2 + 1;
+			modFrame.txframe[j] = (uint8_t)(crc & 0x00ff);
+			modFrame.txframe[j + 1] = (uint8_t)(crc >> 8);	
+			modFrame.txLen = j + 2;
 
 			modFrame.request = TRUE;
 			break;

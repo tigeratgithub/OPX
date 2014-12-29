@@ -237,6 +237,12 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 	if (modFrame.modState == Mod_State_Idle && 
 		modFrame.request == FALSE)
 	{
+		if (tkeys.changed)
+		{
+			modFrame.data[0] = tkeys.ok;
+			mod_master_send(1, WriteMultiCoils, 100, 4);
+		}
+		/*
 		if (modFrame.heartbeat == TRUE)
 		{
 			modFrame.data[0] = 1;
@@ -255,12 +261,12 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 			modFrame.heartbeat = TRUE;
 			mod_master_send(1, WriteMultiRegs, 100, 4);
 		}
-		
+		*/
 		cycleWork(&modFrame);
 	} else {
 		//do something ?
 	}
-
+	
 }
 
 /**
